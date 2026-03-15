@@ -13,32 +13,32 @@ Open-source maintainers are drowning. Popular projects get hundreds of PRs and i
         │
         ▼
   ┌─────────────┐
-  │  Webhook     │  ← FastAPI server receives PR events
-  │  Server      │
+  │  Webhook    │  ← FastAPI server receives PR events
+  │  Server     │
   └──────┬──────┘
          │
          ▼
   ┌─────────────┐
-  │  Nova Act    │  ← Browses the PR, extracts diffs & metadata
-  │  PR Browser  │
+  │  Nova Act   │  ← Browses the PR, extracts diffs & metadata
+  │  PR Browser │
   └──────┬──────┘
          │
          ▼
   ┌─────────────┐
-  │  Test Runner │  ← Clones repo, auto-detects framework, runs tests
-  │  (Sandbox)   │
+  │  Test Runner│  ← Clones repo, auto-detects framework, runs tests
+  │  (Sandbox)  │
   └──────┬──────┘
          │
          ▼
   ┌─────────────┐
-  │  Nova 2 Pro  │  ← Reads FULL codebase (1M tokens) + diff
-  │  Analyzer    │     Finds bugs, breaking changes, missing tests
+  │  Nova 2 Pro │  ← Reads FULL codebase (1M tokens) + diff
+  │  Analyzer   │     Finds bugs, breaking changes, missing tests
   └──────┬──────┘
          │
          ▼
   ┌─────────────┐
-  │  GitHub      │  ← Posts review with inline comments & fix suggestions
-  │  Reviewer    │
+  │  GitHub     │  ← Posts review with inline comments & fix suggestions
+  │  Reviewer   │
   └─────────────┘
 ```
 
