@@ -1,6 +1,6 @@
 # 🤖 Autonomous Open Source Maintainer
 
-An AI-powered agent that automatically reviews Pull Requests on GitHub. It uses **Amazon Nova Act** when configured, falls back to the **GitHub API** for PR metadata when Nova Act auth is unavailable, and uses **Amazon Nova via Bedrock** to analyze the codebase before posting actionable feedback on the PR.
+An AI-powered agent that automatically reviews Pull Requests on GitHub. It attempts to use **Amazon Nova Act** for PR browsing when Nova Act authentication is configured, falls back to the **GitHub API** for PR metadata when it is not, and uses **Amazon Nova via Bedrock** to analyze the codebase before posting actionable feedback on the PR.
 
 ## The Problem
 
@@ -18,10 +18,11 @@ Open-source maintainers are drowning. Popular projects get hundreds of PRs and i
   └──────┬──────┘
          │
          ▼
-  ┌─────────────┐
-  │  Nova Act   │  ← Browses the PR, extracts diffs & metadata
-  │  PR Browser │
-  └──────┬──────┘
+       ┌──────────────────────────────┐
+       │  Nova Act (optional)         │  ← Uses Nova Act only if auth is configured
+       │  GitHub API fallback         │     otherwise falls back to GitHub API
+       │  PR Browser                  │
+       └──────────────┬───────────────┘
          │
          ▼
   ┌─────────────┐
@@ -30,10 +31,10 @@ Open-source maintainers are drowning. Popular projects get hundreds of PRs and i
   └──────┬──────┘
          │
          ▼
-  ┌─────────────┐
-  │  Nova 2 Pro │  ← Reads FULL codebase (1M tokens) + diff
-  │  Analyzer   │     Finds bugs, breaking changes, missing tests
-  └──────┬──────┘
+       ┌──────────────────────────────┐
+       │  Bedrock Analyzer            │  ← Prefers Nova Premier
+       │  Nova Premier -> Nova Pro    │     Falls back to Nova Pro when needed
+       └──────────────┬───────────────┘
          │
          ▼
   ┌─────────────┐
@@ -102,10 +103,18 @@ cp .env.example .env
 ### 4. Authentication Notes
 
 - **GitHub posting permissions:** the bot needs `issues:write` and `pull_requests:write` to post results back to a PR.
-- **Nova Act:** if Nova Act authentication is not configured, the bot automatically falls back to GitHub API metadata collection.
-- **Bedrock:** if Nova Premier cannot be invoked without an inference profile, the analyzer falls back to `amazon.nova-pro-v1:0`.
+- **Nova Act:** this repo does not currently ship a configured Nova Act workflow definition. If Nova Act auth is not configured, the bot automatically falls back to GitHub API metadata collection.
+- **Bedrock:** the analyzer prefers `amazon.nova-premier-v1:0`. If Nova Premier cannot be invoked without an inference profile, it falls back to `amazon.nova-pro-v1:0`.
 
-### 5. Run
+### 5. Actual Nova Usage In This Repo
+
+- **Nova Act:** optional. No workflow definition is committed in this repository today.
+- **PR metadata path used by default:** GitHub API fallback when Nova Act is not configured.
+- **Primary Bedrock model:** `amazon.nova-premier-v1:0`
+- **Automatic fallback Bedrock model:** `amazon.nova-pro-v1:0`
+- **Inference profile support:** optional via `BEDROCK_INFERENCE_PROFILE_ID`
+
+### 6. Run
 
 ```bash
 # Start the webhook server
@@ -115,7 +124,7 @@ uvicorn src.server:app --host 0.0.0.0 --port 8000
 uvicorn src.server:app --reload --port 8000
 ```
 
-### 6. Set Up GitHub Webhook
+### 7. Set Up GitHub Webhook
 
 1. Go to your repo → **Settings** → **Webhooks** → **Add webhook**
 2. **Payload URL:** `https://your-server.com/webhook`
@@ -125,7 +134,7 @@ uvicorn src.server:app --reload --port 8000
 
 > **Tip:** For local development, use [ngrok](https://ngrok.com/) or [smee.io](https://smee.io/) to expose your local server.
 
-### 7. Trigger A Review
+### 8. Trigger A Review
 
 1. Open a pull request in the target repository.
 2. Push another commit to that PR branch, or edit a file from the GitHub UI.
