@@ -1,18 +1,15 @@
-"""Codebase Analyzer — uses Nova 2 Pro (1M context) via Bedrock."""
+"""Codebase Analyzer — uses OpenAI to analyze code + PR diffs."""
 
+import asyncio
 import json
 import logging
 import os
 
-import boto3
-from botocore.exceptions import ClientError
+from openai import OpenAI
 
 from src.config import settings
 
 logger = logging.getLogger(__name__)
-
-PREMIER_MODEL_ID = "amazon.nova-premier-v1:0"
-PRO_MODEL_ID = "amazon.nova-pro-v1:0"
 
 
 def _collect_repo_files(repo_path: str) -> list[dict]:
@@ -50,7 +47,7 @@ def _collect_repo_files(repo_path: str) -> list[dict]:
 
 
 def _build_analysis_prompt(repo_files: list[dict], diff_summary: str) -> str:
-    """Build the prompt that feeds the full codebase + PR diff to Nova 2 Pro."""
+    """Build the prompt that feeds the full codebase + PR diff to OpenAI."""
     codebase_section = ""
     for f in repo_files:
         codebase_section += f"\n\n=== FILE: {f['path']} ===\n{f['content']}"
@@ -87,62 +84,36 @@ Return ONLY valid JSON. No markdown fences.
 """
 
 
+def _invoke_openai(prompt: str) -> str:
+    """Invoke OpenAI Responses API and return plain text output."""
+    if not settings.openai_api_key:
+        raise ValueError("OPENAI_API_KEY is required for analysis in OpenEnv mode")
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    response = client.responses.create(
+        model=settings.openai_model,
+        input=prompt,
+        temperature=0.1,
+        max_output_tokens=4096,
+    )
+    return response.output_text
+
+
 async def analyze_codebase_with_pr(repo_path: str, diff_summary: str) -> dict:
-    """Send the full codebase + PR diff to Nova 2 Pro for deep analysis."""
+    """Send the full codebase + PR diff to OpenAI for deep analysis."""
     logger.info("Collecting repo files from: %s", repo_path)
     repo_files = _collect_repo_files(repo_path)
     logger.info("Collected %d files for analysis", len(repo_files))
 
     prompt = _build_analysis_prompt(repo_files, diff_summary)
 
-    bedrock = boto3.client(
-        "bedrock-runtime",
-        region_name=settings.aws_region,
-        aws_access_key_id=settings.aws_access_key_id,
-        aws_secret_access_key=settings.aws_secret_access_key,
-    )
-
-    model_id = settings.bedrock_inference_profile_id or settings.bedrock_model_id
-    logger.info("Sending analysis request to Bedrock model/profile (%s)…", model_id)
-
-    try:
-        response = bedrock.converse(
-            modelId=model_id,
-            messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={"maxTokens": 8192, "temperature": 0.1},
-        )
-    except ClientError as exc:
-        msg = str(exc)
-        on_demand_error = (
-            "on-demand throughput isn't supported" in msg
-            or "on-demand throughput isn’t supported" in msg
-        )
-        should_fallback = (
-            on_demand_error
-            and settings.bedrock_inference_profile_id is None
-            and model_id == PREMIER_MODEL_ID
-        )
-
-        if should_fallback:
-            logger.warning(
-                "Premier model requires an inference profile. "
-                "Falling back to %s for this run.",
-                PRO_MODEL_ID,
-            )
-            response = bedrock.converse(
-                modelId=PRO_MODEL_ID,
-                messages=[{"role": "user", "content": [{"text": prompt}]}],
-                inferenceConfig={"maxTokens": 8192, "temperature": 0.1},
-            )
-        else:
-            raise
-
-    raw_text = response["output"]["message"]["content"][0]["text"]
+    logger.info("Sending analysis request to OpenAI model (%s)", settings.openai_model)
+    raw_text = await asyncio.to_thread(_invoke_openai, prompt)
 
     try:
         analysis = json.loads(raw_text)
     except json.JSONDecodeError:
-        logger.warning("Bedrock model returned non-JSON; wrapping as raw analysis")
+        logger.warning("OpenAI model returned non-JSON; wrapping as raw analysis")
         analysis = {
             "summary": raw_text[:500],
             "risk_level": "unknown",

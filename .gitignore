@@ -9,3 +9,5 @@ build/
 .ruff_cache/
 .pytest_cache/
 workspaces/
+src/openenv_env.py
+*.env

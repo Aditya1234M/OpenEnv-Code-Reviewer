@@ -1,1 +1,1 @@
-"""Autonomous Open Source Maintainer — AI-powered PR review agent."""
+"""OpenEnv Code Review Environment package."""

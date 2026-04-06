@@ -1,60 +1,34 @@
-"""Pipeline orchestrator — ties together browsing, cloning, analysis, testing, and reviewing."""
+"""OpenEnv pipeline helpers for reset/state/step interaction."""
 
 import logging
+from typing import Any
 
-from src.analyzer import analyze_codebase_with_pr
-from src.pr_browser import browse_pr
-from src.reviewer import post_review
-from src.test_runner import clone_and_run_tests
+from src.openenv_env import CodeReviewOpenEnv
 
 logger = logging.getLogger(__name__)
 
+_ENV = CodeReviewOpenEnv()
 
-async def review_pull_request(pr_info: dict) -> None:
-    """End-to-end review pipeline for a single PR.
-
-    Steps:
-        1. Browse the PR with Nova Act to extract metadata and diffs
-        2. Clone the repo and run existing tests
-        3. Send full codebase + diff to Nova 2 Pro for deep analysis
-        4. Post the review back to GitHub
-    """
-    repo = pr_info["repo_full_name"]
-    pr_num = pr_info["pr_number"]
-    logger.info("=== Starting review pipeline for %s PR #%d ===", repo, pr_num)
-
-    # Step 1: Browse PR with Nova Act
-    logger.info("[1/4] Browsing PR with Nova Act…")
-    pr_details = await browse_pr(pr_info["pr_url"])
-
-    # Step 2: Clone repo and run tests
-    logger.info("[2/4] Cloning repo and running tests…")
-    test_results = await clone_and_run_tests(pr_info)
-
-    # Step 3: Analyze codebase with Nova 2 Pro
-    logger.info("[3/4] Analyzing codebase with Nova 2 Pro…")
-    diff_summary = _format_diff_summary(pr_details)
-    analysis = await analyze_codebase_with_pr(test_results["repo_path"], diff_summary)
-
-    # Step 4: Post review to GitHub
-    logger.info("[4/4] Posting review to GitHub…")
-    await post_review(pr_info, analysis, test_results)
-
-    logger.info("=== Review pipeline complete for %s PR #%d ===", repo, pr_num)
+def reset_environment(seed: int | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Reset environment and return initial observation + info."""
+    obs, info = _ENV.reset(seed=seed)
+    logger.info("Environment reset with task_id=%s", info.get("task_id"))
+    return obs, info
 
 
-def _format_diff_summary(pr_details: dict) -> str:
-    """Format the PR details into a diff summary string for the analyzer."""
-    parts = [
-        f"PR Title: {pr_details.get('title', 'N/A')}",
-        f"PR Description: {pr_details.get('description', 'N/A')}",
-        f"CI Status: {pr_details.get('ci_status', 'unknown')}",
-        "",
-        "Changed Files:",
-    ]
+def current_state() -> dict[str, Any]:
+    """Return current observation without mutating environment state."""
+    return _ENV.state()
 
-    for change in pr_details.get("file_changes", []):
-        parts.append(f"\n--- {change.get('file_path', 'unknown')} ---")
-        parts.append(change.get("diff", ""))
 
-    return "\n".join(parts)
+def step_environment(action: dict[str, Any] | str) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
+    """Apply an action (review JSON) and return OpenEnv step tuple."""
+    obs, reward, terminated, truncated, info = _ENV.step(action)
+    logger.info(
+        "Environment step complete task_id=%s reward=%.4f terminated=%s truncated=%s",
+        info.get("task_id"),
+        reward,
+        terminated,
+        truncated,
+    )
+    return obs, reward, terminated, truncated, info
