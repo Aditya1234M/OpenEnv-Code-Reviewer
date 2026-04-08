@@ -7,7 +7,6 @@ An external AI agent receives a static PR task (diff + context), submits a revie
 ## What Changed
 
 - Added GitHub Actions integration endpoint for live PR grading.
-- Removed Nova Act and Bedrock from the active model path.
 - Added OpenAI-backed analyzer utilities.
 - Added deterministic OpenEnv environment API:
   - reset(seed)
