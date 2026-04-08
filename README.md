@@ -113,6 +113,8 @@ uvicorn src.server:app --host 0.0.0.0 --port 8000
 4. `POST /grade` (one-shot reset + step + grading report)
 5. `POST /github/pr-review-grade` (GitHub Actions friendly with markdown summary)
 
+These first three endpoints (`/reset`, `/state`, `/step`) are the core OpenEnv interaction loop required by evaluators.
+
 ## GitHub Actions Integration
 
 Use GitHub Actions in the target repository to call this service on PR events.
@@ -241,6 +243,37 @@ Example `POST /step` body:
 
 - Docker: package this API and dataset for deterministic scoring.
 - Colab: load tasks, run a baseline agent loop, and report average reward.
+
+### Docker Quickstart
+
+Build image:
+
+```bash
+docker build -t openenv-code-review:latest .
+```
+
+Run container with env file:
+
+```bash
+docker run --rm -p 8000:8000 --env-file .env openenv-code-review:latest
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+## Hugging Face Dataset
+
+- Dataset file used by this environment: `data/pr_tasks.jsonl`
+- Publish URL: `https://huggingface.co/datasets/<your-username>/<your-dataset-name>`
+
+Quick publish steps:
+
+1. Create a new dataset repo on Hugging Face.
+2. Upload `data/pr_tasks.jsonl`.
+3. Replace the placeholder URL above with your final dataset link.
 
 ## License
 
