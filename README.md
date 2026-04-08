@@ -6,7 +6,7 @@ An external AI agent receives a static PR task (diff + context), submits a revie
 
 ## What Changed
 
-- Removed webhook-first runtime from the active execution path.
+- Added GitHub Actions integration endpoint for live PR grading.
 - Removed Nova Act and Bedrock from the active model path.
 - Added OpenAI-backed analyzer utilities.
 - Added deterministic OpenEnv environment API:
@@ -94,6 +94,7 @@ Create `.env` with at least:
 ```env
 OPENAI_API_KEY=your_key
 OPENAI_MODEL=gpt-4.1-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
 OPENENV_DATASET_PATH=data/pr_tasks.jsonl
 OPENENV_MAX_STEPS=1
 ```
@@ -109,6 +110,119 @@ uvicorn src.server:app --host 0.0.0.0 --port 8000
 1. `POST /reset`
 2. `GET /state`
 3. `POST /step`
+4. `POST /grade` (one-shot reset + step + grading report)
+5. `POST /github/pr-review-grade` (GitHub Actions friendly with markdown summary)
+
+## GitHub Actions Integration
+
+Use GitHub Actions in the target repository to call this service on PR events.
+
+1. Add repo secret `GRADER_URL` pointing to your deployed server URL.
+2. Trigger workflow on `pull_request` (`opened`, `synchronize`, `reopened`).
+3. Build or generate agent action JSON in workflow.
+4. Call `POST /github/pr-review-grade`.
+5. Post `summary_markdown` to PR comment or check summary.
+
+See template: `docs/pr-grader-workflow.yml`.
+
+## Evaluator Step-by-Step Guide
+
+Use this section to evaluate the project end-to-end without author assistance.
+
+### A) Start the Grader Service
+
+1. Clone the repository and install dependencies.
+2. Create `.env` based on `.env.example`.
+3. Run the API service:
+
+```bash
+uvicorn src.server:app --host 0.0.0.0 --port 8000
+```
+
+4. Verify health:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Expected: JSON with `status: ok`.
+
+### B) Expose Service Publicly (if using GitHub Actions from another repo)
+
+If evaluating from an external repo, expose local service (for example via ngrok):
+
+```bash
+ngrok http 8000
+```
+
+Copy the HTTPS public URL; this becomes `GRADER_URL`.
+
+### C) Configure Target Repository Secrets
+
+In target repo: **Settings -> Secrets and variables -> Actions -> Repository secrets**
+
+Add:
+
+1. `GRADER_URL` = public base URL of grader service (`https://...`)
+2. `OPENAI_API_KEY` = model provider key used by workflow to generate actions
+3. Optional `OPENAI_BASE_URL` = provider base URL (for OpenRouter/OpenAI-compatible endpoints)
+4. Optional `OPENAI_MODEL` = override model name (defaults to `gpt-4.1-mini`)
+
+### D) Add Workflow in Target Repository
+
+1. Create file: `.github/workflows/pr-grader.yml`
+2. Paste workflow template from `docs/pr-grader-workflow.yml`
+3. Commit to default branch
+
+### E) Trigger Evaluation
+
+1. Open a PR in target repo (or push a new commit to existing PR)
+2. Go to **Actions** tab and open `PR Grader` run
+3. Wait until run completes
+
+### F) Verify Successful Evaluation
+
+Check all of the following:
+
+1. Workflow run status is green
+2. PR Conversation tab contains bot grading comment
+3. Comment includes grade, explanation, and score breakdown
+4. Grader service logs show request to `/github/pr-review-grade`
+
+### G) Troubleshooting
+
+1. `httpx.UnsupportedProtocol` or invalid URL errors:
+  Ensure secrets include full protocol (`https://...`) for `GRADER_URL` and optional `OPENAI_BASE_URL`.
+2. No workflow run visible:
+  Ensure workflow is in `.github/workflows/pr-grader.yml` on default branch and trigger types include pull_request events.
+3. No PR comment:
+  Ensure workflow permissions include `pull-requests: write`.
+4. ngrok URL works in browser but fails in CI:
+  Keep `ngrok-skip-browser-warning` header in workflow request.
+
+## Live UI Output
+
+- Open `http://127.0.0.1:8000/` for a built-in grading UI.
+- Paste agent action JSON and get visible score breakdown, grade, and report.
+
+## GitHub Actions Integration
+
+Use `POST /github/pr-review-grade` with:
+
+```json
+{
+  "seed": 123,
+  "pr_url": "https://github.com/org/repo/pull/123",
+  "action": {
+    "overall_decision": "request_changes",
+    "issues": [
+      {"file": "auth.py", "line": 5, "category": "security", "severity": "critical", "description": "..."}
+    ]
+  }
+}
+```
+
+The response includes `summary_markdown` / `markdown_report` you can publish to PR checks.
 
 Example `POST /step` body:
 

@@ -85,18 +85,36 @@ Return ONLY valid JSON. No markdown fences.
 
 
 def _invoke_openai(prompt: str) -> str:
-    """Invoke OpenAI Responses API and return plain text output."""
+    """Invoke an OpenAI-compatible chat completion endpoint and return text output."""
     if not settings.openai_api_key:
         raise ValueError("OPENAI_API_KEY is required for analysis in OpenEnv mode")
 
-    client = OpenAI(api_key=settings.openai_api_key)
-    response = client.responses.create(
-        model=settings.openai_model,
-        input=prompt,
-        temperature=0.1,
-        max_output_tokens=4096,
+    base_url = settings.openai_base_url.strip() or "https://api.openai.com/v1"
+    # Auto-switch for OpenRouter keys when base URL is not explicitly set.
+    if base_url == "https://api.openai.com/v1" and settings.openai_api_key.startswith("sk-or-"):
+        base_url = "https://openrouter.ai/api/v1"
+
+    default_headers = None
+    if "openrouter.ai" in base_url:
+        default_headers = {}
+        if settings.openrouter_site_url:
+            default_headers["HTTP-Referer"] = settings.openrouter_site_url
+        if settings.openrouter_app_name:
+            default_headers["X-Title"] = settings.openrouter_app_name
+
+    client = OpenAI(
+        api_key=settings.openai_api_key,
+        base_url=base_url,
+        default_headers=default_headers,
     )
-    return response.output_text
+    response = client.chat.completions.create(
+        model=settings.openai_model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+        max_tokens=4096,
+    )
+    content = response.choices[0].message.content if response.choices else ""
+    return content or ""
 
 
 async def analyze_codebase_with_pr(repo_path: str, diff_summary: str) -> dict:

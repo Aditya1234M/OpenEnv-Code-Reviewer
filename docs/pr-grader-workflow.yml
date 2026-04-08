@@ -1,0 +1,164 @@
+name: PR Grader
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  grade-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect PR changed files
+        id: prdata
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                per_page: 100,
+              }
+            );
+
+            const compact = files.map((f) => ({
+              filename: f.filename,
+              status: f.status,
+              patch: (f.patch || "").slice(0, 5000),
+            }));
+
+            const payload = {
+              pr_url: pr.html_url,
+              title: pr.title || "",
+              body: pr.body || "",
+              files: compact,
+            };
+
+            core.setOutput("pr_json", JSON.stringify(payload));
+
+      - name: Install model dependency
+        run: |
+          python -m pip install --upgrade pip
+          pip install openai
+
+      - name: Generate agent action from PR diff
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          PR_JSON: ${{ steps.prdata.outputs.pr_json }}
+        run: |
+          python - << 'PY'
+          import json
+          import os
+
+          from openai import OpenAI
+
+          pr = json.loads(os.environ["PR_JSON"])
+          api_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
+          if not api_key:
+              raise SystemExit("Missing OPENAI_API_KEY secret")
+
+          model = (os.environ.get("OPENAI_MODEL") or "gpt-4.1-mini").strip()
+          base_url = (os.environ.get("OPENAI_BASE_URL") or "").strip() or None
+
+          client_kwargs = {"api_key": api_key}
+          if base_url:
+              client_kwargs["base_url"] = base_url
+
+          client = OpenAI(**client_kwargs)
+
+          schema = {
+              "overall_decision": "request_changes",
+              "issues": [
+                  {
+                      "file": "path/to/file.py",
+                      "line": 42,
+                      "category": "bug",
+                      "severity": "high",
+                      "description": "Concise finding"
+                  }
+              ]
+          }
+
+          prompt = (
+              "You are a senior code review agent. Analyze the pull request data and produce ONLY valid JSON. "
+              "Use this exact schema with same keys: " + json.dumps(schema) + " "
+              "Rules: max 8 issues, set line to the best estimate from patch hunk, avoid duplicates, "
+              "if no strong issue return overall_decision=comment with empty issues. "
+              "PR data: " + json.dumps(pr)
+          )
+
+          response = client.chat.completions.create(
+              model=model,
+              messages=[{"role": "user", "content": prompt}],
+              temperature=0.1,
+              max_tokens=1400,
+          )
+          text = (response.choices[0].message.content if response.choices else "") or ""
+          text = text.strip()
+
+          if text.startswith("```"):
+              text = text.strip("`")
+              if text.lower().startswith("json"):
+                  text = text[4:]
+              text = text.strip()
+
+          try:
+              action = json.loads(text)
+          except Exception:
+              action = {"overall_decision": "comment", "issues": []}
+
+          if not isinstance(action, dict):
+              action = {"overall_decision": "comment", "issues": []}
+          if "overall_decision" not in action:
+              action["overall_decision"] = "comment"
+          if "issues" not in action or not isinstance(action["issues"], list):
+              action["issues"] = []
+
+          payload = {
+              "seed": 123,
+              "pr_url": pr.get("pr_url"),
+              "action": action,
+          }
+
+          with open("payload.json", "w", encoding="utf-8") as f:
+              json.dump(payload, f)
+          PY
+
+      - name: Call OpenEnv grader endpoint
+        env:
+          GRADER_URL: ${{ secrets.GRADER_URL }}
+        run: |
+          curl -sS -X POST "${GRADER_URL%/}/github/pr-review-grade" \
+            -H "Content-Type: application/json" \
+            -H "ngrok-skip-browser-warning: true" \
+            --data @payload.json > grade_response.json
+
+          python - << 'PY'
+          import json
+          data = json.load(open('grade_response.json', 'r', encoding='utf-8'))
+          summary = data.get('summary_markdown', 'No summary_markdown found')
+          open('summary.md', 'w', encoding='utf-8').write(summary)
+          print('summary_length=', len(summary))
+          PY
+
+      - name: Post grading summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('summary.md', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body
+            });
