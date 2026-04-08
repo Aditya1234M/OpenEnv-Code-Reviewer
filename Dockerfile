@@ -9,6 +9,7 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 COPY src ./src
+COPY server ./server
 COPY data ./data
 COPY README.md ./
 
