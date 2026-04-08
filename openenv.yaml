@@ -1,0 +1,25 @@
+name: openenv-code-review
+display_name: OpenEnv Code Review Environment
+version: 1
+
+description: |
+  Deterministic OpenEnv environment for grading code review actions.
+  Supports standard reset/state/step interaction and one-shot grading APIs.
+
+runtime:
+  language: python
+  entrypoint: inference.py
+
+interfaces:
+  openenv:
+    reset: /reset
+    state: /state
+    step: /step
+  grading:
+    endpoint: /grade
+    github_endpoint: /github/pr-review-grade
+
+artifacts:
+  dataset: data/pr_tasks.jsonl
+  server: src/server.py
+  env: src/openenv_env.py
