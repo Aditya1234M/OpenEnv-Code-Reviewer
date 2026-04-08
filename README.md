@@ -275,6 +275,10 @@ Quick publish steps:
 2. Upload `data/pr_tasks.jsonl`.
 3. Replace the placeholder URL above with your final dataset link.
 
+If deploying to Hugging Face Spaces and you see a configuration error, follow:
+
+- `docs/HF_SPACE_QUICK_FIX.md`
+
 ## License
 
 MIT
