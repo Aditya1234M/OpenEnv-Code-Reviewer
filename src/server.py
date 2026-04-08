@@ -210,9 +210,10 @@ async def index() -> str:
 
 
 @app.post("/reset")
-async def reset(payload: ResetRequest):
+async def reset(payload: ResetRequest | None = None):
     """Start a new episode and return initial observation."""
-    obs, info = reset_environment(seed=payload.seed)
+    seed = payload.seed if payload is not None else None
+    obs, info = reset_environment(seed=seed)
     return {"observation": obs, "info": info}
 
 
@@ -223,8 +224,15 @@ async def state():
 
 
 @app.post("/step")
-async def step(payload: StepRequest):
+async def step(payload: StepRequest | None = None):
     """Apply an action and return OpenEnv transition tuple."""
+    if payload is None:
+        return {
+            "status": "ok",
+            "message": "No body provided. Returning demo step response.",
+            "result": _grade_action(_DEFAULT_ACTION, 123, None),
+        }
+
     try:
         obs, reward, terminated, truncated, info = step_environment(payload.action)
     except RuntimeError as exc:
