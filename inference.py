@@ -43,9 +43,19 @@ def run_inference(action: dict[str, Any] | None = None, seed: int = 123) -> dict
 
 
 def main() -> None:
-    """CLI entrypoint: prints JSON result to stdout."""
+    """CLI entrypoint: prints parser-friendly logs and JSON result to stdout."""
     result = run_inference()
-    print(json.dumps(result, ensure_ascii=True))
+    task_id = str(result.get("task_id") or "unknown")
+    reward = float(result.get("reward", 0.0))
+    score_block = result.get("score", {})
+    score = float(score_block.get("final", 0.0)) if isinstance(score_block, dict) else 0.0
+
+    # Required by external evaluator: structured stdout markers.
+    print(f"[START] task={task_id}", flush=True)
+    print(f"[STEP] step=1 reward={reward:.6f}", flush=True)
+    print(f"[END] task={task_id} score={score:.6f} steps=1", flush=True)
+
+    print(json.dumps(result, ensure_ascii=True), flush=True)
 
 
 if __name__ == "__main__":
