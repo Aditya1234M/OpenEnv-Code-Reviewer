@@ -181,14 +181,18 @@ def _run_three_tasks() -> list[dict[str, Any]]:
         action = _action_for_task(task_id)
         obs2, reward, terminated, truncated, step_info = env.step(action)
 
-        score = _score_in_open_interval(float(reward))
+        raw_reward = float(reward)
+        score = _score_in_open_interval(raw_reward)
         task_runs.append(
             {
                 "task_id": task_id,
                 "difficulty": str(obs2.get("difficulty", "unknown")),
                 "domain": str(obs2.get("domain", "unknown")),
-                "reward": float(reward),
+                # Keep both reward/score in strict (0,1) for evaluator compatibility.
+                "reward": score,
+                "score": score,
                 "score_0_1": score,
+                "raw_reward": raw_reward,
                 "terminated": terminated,
                 "truncated": truncated,
                 "score_details": step_info.get("score", {}),
@@ -214,11 +218,11 @@ def _summarize_by_difficulty(tasks: list[dict[str, Any]]) -> dict[str, Any]:
     summary: dict[str, Any] = {}
     for difficulty, rows in grouped.items():
         count = len(rows)
-        avg_reward = sum(float(r.get("reward", 0.0)) for r in rows) / count
+        avg_reward = sum(float(r.get("raw_reward", 0.0)) for r in rows) / count
         avg_score_0_1 = sum(float(r.get("score_0_1", 0.0)) for r in rows) / count
         summary[difficulty] = {
             "count": count,
-            "avg_reward": avg_reward,
+            "avg_reward_raw": avg_reward,
             "avg_score_0_1": avg_score_0_1,
         }
 
@@ -237,7 +241,7 @@ def main() -> None:
     for task in tasks:
         task_id = str(task.get("task_id") or "unknown")
         reward = float(task.get("reward", 0.0))
-        score = float(task.get("score_0_1", 0.5))
+        score = float(task.get("score", 0.5))
         print(f"[START] task={task_id}", flush=True)
         print(f"[STEP] step=1 reward={reward:.6f}", flush=True)
         print(f"[END] task={task_id} score={score:.6f} steps=1", flush=True)
