@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import defaultdict
 from typing import Any
 
 from openai import OpenAI
@@ -184,6 +185,8 @@ def _run_three_tasks() -> list[dict[str, Any]]:
         task_runs.append(
             {
                 "task_id": task_id,
+                "difficulty": str(obs2.get("difficulty", "unknown")),
+                "domain": str(obs2.get("domain", "unknown")),
                 "reward": float(reward),
                 "score_0_1": score,
                 "terminated": terminated,
@@ -199,6 +202,30 @@ def _run_three_tasks() -> list[dict[str, Any]]:
 
     # Absolute guardrail for validator contract.
     return task_runs[:3]
+
+
+def _summarize_by_difficulty(tasks: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return simple mean reward/score grouped by task difficulty."""
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for task in tasks:
+        difficulty = str(task.get("difficulty", "unknown") or "unknown").lower()
+        grouped[difficulty].append(task)
+
+    summary: dict[str, Any] = {}
+    for difficulty, rows in grouped.items():
+        count = len(rows)
+        avg_reward = sum(float(r.get("reward", 0.0)) for r in rows) / count
+        avg_score_0_1 = sum(float(r.get("score_0_1", 0.0)) for r in rows) / count
+        summary[difficulty] = {
+            "count": count,
+            "avg_reward": avg_reward,
+            "avg_score_0_1": avg_score_0_1,
+        }
+
+    return {
+        "total_tasks": len(tasks),
+        "by_difficulty": summary,
+    }
 
 
 def main() -> None:
@@ -218,6 +245,7 @@ def main() -> None:
     payload = {
         "llm_proxy_probe": llm_probe,
         "tasks": tasks,
+        "difficulty_summary": _summarize_by_difficulty(tasks),
     }
     print(json.dumps(payload, ensure_ascii=True), flush=True)
 
