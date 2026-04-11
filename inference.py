@@ -93,8 +93,11 @@ def run_inference(action: dict[str, Any] | None = None, seed: int = 123) -> dict
 
 
 def _score_in_open_interval(reward: float) -> float:
-    """Map reward from [-1, 1] to a strict (0, 1) interval for validators."""
-    mapped = (reward + 1.0) / 2.0
+    """Normalize reward to strict (0,1) from either [-1,1] or [0,1] ranges."""
+    if 0.0 <= reward <= 1.0:
+        mapped = reward
+    else:
+        mapped = (reward + 1.0) / 2.0
     return max(1e-6, min(1.0 - 1e-6, mapped))
 
 
