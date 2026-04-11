@@ -131,7 +131,7 @@ def _score_action(action: dict[str, Any], ground_truth: dict[str, Any]) -> tuple
     max_score = max(len(expected) * 1.25 + 0.5, 1.0)
     signed_reward = max(-1.0, min(1.0, raw_score / max_score))
     # External validators require task scores strictly inside (0, 1).
-    reward = max(1e-6, min(1.0 - 1e-6, (signed_reward + 1.0) / 2.0))
+    reward = max(0.01, min(0.99, (signed_reward + 1.0) / 2.0))
 
     info = {
         "true_positives": tp,

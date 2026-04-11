@@ -82,12 +82,14 @@ def run_inference(action: dict[str, Any] | None = None, seed: int = 123) -> dict
         }
 
     obs2, reward, terminated, truncated, step_info = env.step(action)
+    score = _score_in_open_interval(float(reward))
     return {
         "task_id": info.get("task_id"),
-        "reward": reward,
+        "reward": score,
         "terminated": terminated,
         "truncated": truncated,
-        "score": step_info.get("score", {}),
+        "score": score,
+        "metrics": step_info.get("score", {}),
         "observation": obs2,
     }
 
@@ -98,7 +100,7 @@ def _score_in_open_interval(reward: float) -> float:
         mapped = reward
     else:
         mapped = (reward + 1.0) / 2.0
-    return max(1e-6, min(1.0 - 1e-6, mapped))
+    return max(0.01, min(0.99, mapped))
 
 
 def _action_for_task(task_id: str) -> dict[str, Any]:
@@ -195,10 +197,8 @@ def _run_three_tasks() -> list[dict[str, Any]]:
                 "reward": score,
                 "score": score,
                 "score_0_1": score,
-                "raw_reward": raw_reward,
                 "terminated": terminated,
                 "truncated": truncated,
-                "score_details": step_info.get("score", {}),
                 "observation": obs2,
             }
         )
@@ -221,11 +221,11 @@ def _summarize_by_difficulty(tasks: list[dict[str, Any]]) -> dict[str, Any]:
     summary: dict[str, Any] = {}
     for difficulty, rows in grouped.items():
         count = len(rows)
-        avg_reward = sum(float(r.get("raw_reward", 0.0)) for r in rows) / count
+        avg_reward = sum(float(r.get("reward", 0.0)) for r in rows) / count
         avg_score_0_1 = sum(float(r.get("score_0_1", 0.0)) for r in rows) / count
         summary[difficulty] = {
             "count": count,
-            "avg_reward_raw": avg_reward,
+            "avg_reward": avg_reward,
             "avg_score_0_1": avg_score_0_1,
         }
 
