@@ -243,6 +243,20 @@ Example `POST /step` body:
 - Docker: package this API and dataset for deterministic scoring.
 - Colab: load tasks, run a baseline agent loop, and report average reward.
 
+### Baseline Evaluation (All Tasks)
+
+Run deterministic baseline evaluation across the full dataset:
+
+```bash
+python scripts/baseline_eval.py
+```
+
+For full JSON output (including per-task details):
+
+```bash
+python scripts/baseline_eval.py --json
+```
+
 ### Docker Quickstart
 
 Build image:
