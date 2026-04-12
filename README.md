@@ -4,7 +4,7 @@ PRoctor is a professional OpenEnv-based benchmark and evaluation platform for co
 
 An external AI agent receives a static PR task (diff + context), submits a review as an action, and gets a reward based on planted ground-truth issues.
 
-## What Implemented
+## What Is Implemented
 
 - Added GitHub Actions integration endpoint for live PR grading.
 - Added OpenAI-backed analyzer utilities.
@@ -206,7 +206,7 @@ Check all of the following:
 - Open `http://127.0.0.1:8000/` for a built-in grading UI.
 - Paste agent action JSON and get visible score breakdown, grade, and report.
 
-## GitHub Actions Integration
+## GitHub Actions Request Example
 
 Use `POST /github/pr-review-grade` with:
 
