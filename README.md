@@ -262,24 +262,26 @@ python scripts/baseline_eval.py --json
 Train a lightweight epsilon-greedy policy on environment rewards:
 
 ```bash
-python scripts/train_policy.py --episodes 300 --alpha 0.2 --epsilon 0.15
+python scripts/train_policy.py --dataset data/pr_tasks.jsonl --split train --episodes 300 --alpha 0.2 --epsilon 0.15
 ```
 
 This writes a learned policy snapshot to `artifacts/policy.json`.
 
 ### Compare Trained Policy vs Baseline
 
-After training, compare performance across all tasks:
+After training, compare performance on held-out test tasks:
 
 ```bash
-python scripts/eval_policy.py --dataset data/pr_tasks.jsonl --policy artifacts/policy.json
+python scripts/eval_policy.py --dataset data/pr_tasks.jsonl --split test --policy artifacts/policy.json
 ```
 
 For full JSON report (overall + per-task + per-difficulty):
 
 ```bash
-python scripts/eval_policy.py --dataset data/pr_tasks.jsonl --policy artifacts/policy.json --json
+python scripts/eval_policy.py --dataset data/pr_tasks.jsonl --split test --policy artifacts/policy.json --json
 ```
+
+To evaluate on all tasks instead of a split, use `--split all`.
 
 ### Docker Quickstart
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from collections import defaultdict
@@ -39,6 +40,23 @@ def _load_jsonl(path: str) -> list[dict[str, Any]]:
 
 def _load_policy(path: str) -> dict[str, Any]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def _infer_split(task_id: str) -> str:
+    """Stable split when dataset rows do not provide explicit split."""
+    bucket = int(hashlib.md5(task_id.encode("utf-8")).hexdigest(), 16) % 10
+    if bucket < 7:
+        return "train"
+    if bucket < 9:
+        return "val"
+    return "test"
+
+
+def _task_split(task: dict[str, Any]) -> str:
+    explicit = str(task.get("split", "")).strip().lower()
+    if explicit in {"train", "val", "test"}:
+        return explicit
+    return _infer_split(str(task.get("task_id", "unknown")))
 
 
 def _baseline_action_for_task(task_id: str) -> dict[str, Any]:
@@ -154,10 +172,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Compare trained policy against baseline")
     parser.add_argument("--dataset", default="data/pr_tasks.jsonl", help="Path to dataset JSONL")
     parser.add_argument("--policy", default="artifacts/policy.json", help="Path to trained policy JSON")
+    parser.add_argument(
+        "--split",
+        default="test",
+        choices=["train", "val", "test", "all"],
+        help="Evaluate on a specific split (default: test)",
+    )
     parser.add_argument("--json", action="store_true", help="Print full JSON output")
     args = parser.parse_args()
 
     tasks = _load_jsonl(args.dataset)
+    if args.split != "all":
+        tasks = [t for t in tasks if _task_split(t) == args.split]
+    if not tasks:
+        raise ValueError(f"No tasks available for split '{args.split}'")
+
     policy_blob = _load_policy(args.policy)
     policy_map = policy_blob.get("policy", {})
 
@@ -177,6 +206,7 @@ def main() -> None:
 
     output = {
         "dataset": args.dataset,
+        "split": args.split,
         "policy": args.policy,
         "baseline": baseline_summary,
         "trained": trained_summary,
@@ -192,6 +222,7 @@ def main() -> None:
         return
 
     print(f"dataset={args.dataset}")
+    print(f"split={args.split}")
     print(f"policy={args.policy}")
     print(f"baseline_avg_score={baseline_summary['avg_score']:.4f}")
     print(f"trained_avg_score={trained_summary['avg_score']:.4f}")
