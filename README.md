@@ -1,6 +1,6 @@
-# OpenEnv Code Review Environment
+# PRoctor - OpenEnv Code Agent Reviewer
 
-This project is now an OpenEnv-style reinforcement learning environment for code review.
+PRoctor is a professional OpenEnv-based benchmark and evaluation platform for code review agents, designed to score agent-generated pull request reviews through deterministic, reproducible reward signals. It standardizes how review quality is measured across tasks, enabling reliable comparison, policy training, and held-out evaluation for reinforcement-learning-style workflows.
 
 An external AI agent receives a static PR task (diff + context), submits a review as an action, and gets a reward based on planted ground-truth issues.
 
