@@ -257,6 +257,16 @@ For full JSON output (including per-task details):
 python scripts/baseline_eval.py --json
 ```
 
+### Minimal RL Training Loop
+
+Train a lightweight epsilon-greedy policy on environment rewards:
+
+```bash
+python scripts/train_policy.py --episodes 300 --alpha 0.2 --epsilon 0.15
+```
+
+This writes a learned policy snapshot to `artifacts/policy.json`.
+
 ### Docker Quickstart
 
 Build image:
