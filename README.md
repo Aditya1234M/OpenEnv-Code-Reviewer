@@ -4,7 +4,7 @@ PRoctor is a professional OpenEnv-based benchmark and evaluation platform for co
 
 An external AI agent receives a static PR task (diff + context), submits a review as an action, and gets a reward based on planted ground-truth issues.
 
-## What Changed
+## What Implemented
 
 - Added GitHub Actions integration endpoint for live PR grading.
 - Added OpenAI-backed analyzer utilities.
