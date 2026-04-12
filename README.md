@@ -267,6 +267,20 @@ python scripts/train_policy.py --episodes 300 --alpha 0.2 --epsilon 0.15
 
 This writes a learned policy snapshot to `artifacts/policy.json`.
 
+### Compare Trained Policy vs Baseline
+
+After training, compare performance across all tasks:
+
+```bash
+python scripts/eval_policy.py --dataset data/pr_tasks.jsonl --policy artifacts/policy.json
+```
+
+For full JSON report (overall + per-task + per-difficulty):
+
+```bash
+python scripts/eval_policy.py --dataset data/pr_tasks.jsonl --policy artifacts/policy.json --json
+```
+
 ### Docker Quickstart
 
 Build image:
